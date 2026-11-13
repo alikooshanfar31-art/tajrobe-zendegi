@@ -1,0 +1,42 @@
+name: Build APK
+on:
+  workflow_dispatch:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Prepare www
+        run: |
+          mkdir -p www
+          cp index.html manifest.webmanifest sw.js icon-192.png icon-512.png www/
+      - run: npm install
+      - run: npx cap add android
+      - name: Set app icon
+        run: |
+          cd android/app/src/main/res
+          rm -rf mipmap-anydpi-v26
+          for pair in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
+            d=${pair%%:*}; s=${pair##*:}
+            for n in ic_launcher ic_launcher_round ic_launcher_foreground; do
+              convert "$GITHUB_WORKSPACE/icon-512.png" -resize ${s}x${s} mipmap-$d/$n.png
+            done
+          done
+      - run: npx cap sync android
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tajrobe-zendegi-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
