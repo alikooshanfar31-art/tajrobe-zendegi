@@ -1,0 +1,12 @@
+const V='tz-v8',CORE=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png'],EXT=['https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;500;800&display=swap','https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'];
+self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(async c=>{await c.addAll(CORE);await Promise.all(EXT.map(u=>c.add(new Request(u,{mode:'no-cors'})).catch(()=>{})))}).then(()=>self.skipWaiting()))});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==V).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});
+self.addEventListener('fetch',e=>{const r=e.request;if(r.method!=='GET')return;const u=new URL(r.url),ext=/fonts\.(googleapis|gstatic)\.com|cdnjs\.cloudflare\.com/.test(u.host);
+if(ext||u.origin===location.origin){e.respondWith(caches.match(r).then(h=>{const n=fetch(r).then(x=>{if(x&&(x.ok||x.type==='opaque'))caches.open(V).then(c=>c.put(r,x.clone()));return x}).catch(()=>h||caches.match('index.html'));return h||n}))}});
+self.addEventListener('message',e=>{const u=(e.data&&e.data.warm)||[];e.waitUntil(caches.open(V).then(c=>Promise.all(u.filter(x=>/^https:/.test(x)).map(x=>c.add(new Request(x,{mode:'no-cors'})).catch(()=>{})))))});
+const db=()=>new Promise((a,b)=>{const r=indexedDB.open('krem',1);r.onupgradeneeded=()=>r.result.createObjectStore('s');r.onsuccess=()=>a(r.result);r.onerror=()=>b(r.error)});
+const get=async k=>{const d=await db();return new Promise(a=>{const q=d.transaction('s').objectStore('s').get(k);q.onsuccess=()=>a(q.result);q.onerror=()=>a()})};
+const put=async(k,v)=>{const d=await db();return new Promise(a=>{const x=d.transaction('s','readwrite');x.objectStore('s').put(v,k);x.oncomplete=a})};
+async function remind(){const st=await get('rem');if(!st||!st.rem)return false;const n=new Date(),today=n.toDateString();if(st.date===today&&st.done)return false;const p=(st.rt||'20:00').split(':').map(Number);if(n.getHours()*60+n.getMinutes()<p[0]*60+p[1])return false;if(await get('notified')===today)return false;await put('notified',today);await self.registration.showNotification('تجربه زندگی متفاوت',{body:'ماموریت امروزت منتظرته',icon:'icon-192.png',tag:'kdaily',lang:'fa',dir:'rtl'});return true}
+self.addEventListener('periodicsync',e=>{if(e.tag==='kdaily')e.waitUntil(remind())});
+self.addEventListener('notificationclick',e=>{e.notification.close();e.waitUntil(clients.matchAll({type:'window'}).then(l=>l.length?l[0].focus():clients.openWindow('./')))});
